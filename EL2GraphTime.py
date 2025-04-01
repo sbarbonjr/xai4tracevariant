@@ -80,7 +80,7 @@ class EL2GraphTime():
         ########################################################
         # Writing the profiled dataset
         ########################################################
-        df_feature_vector.to_csv(f"./results/{database_name}_profiled.csv", index=False)
+        df_feature_vector.to_csv(f"./results/{database_name}_profiled.csv", index=True)
         
         for wa in [0.5, 1.0]:
             for wt in [0.5, 1.0]:
@@ -91,8 +91,11 @@ class EL2GraphTime():
                         time_features * wtime
                     )
                     G = self.extract_knn_graph(distance_matrix, n_neighbors=self.k)
+                    G = nx.relabel_nodes(G, {i: case_id for i, case_id in enumerate(df_feature_vector.index)})
                     filename = f"./results/{database_name}_k{self.k}_wa{wa}_wt{wt}_wtime{wtime}.graphml"
                     nx.write_graphml(G, filename)
+
+
 
     def __getitem__(self, idx):
         return self.graphs[idx]
@@ -204,8 +207,8 @@ class EL2GraphTime():
         print("Extracting k-NN graph...")
         start_time = time.time()
         # Create a k-NN graph from the distance matrix
-        knn_graph = kneighbors_graph(distance_matrix, n_neighbors=n_neighbors, metric='precomputed', mode='connectivity',)
-        G = nx.from_scipy_sparse_array(knn_graph)
+        spmatrix = kneighbors_graph(distance_matrix, n_neighbors=n_neighbors, metric='precomputed', mode='connectivity',)
+        G = nx.from_scipy_sparse_array(spmatrix)
         end_time = time.time() - start_time
         print(f"...k-NN took {round(end_time, 2)} seconds")
         return G
