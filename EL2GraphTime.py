@@ -2,6 +2,8 @@ import pm4py
 import pandas as pd
 import numpy as np
 
+import pickle
+
 from sklearn.neighbors import NearestNeighbors
 from sklearn.neighbors import kneighbors_graph
 from scipy.spatial.distance import euclidean
@@ -44,7 +46,7 @@ class EL2GraphTime():
                
         df_filtered_ocel = filtered_ocel.get_extended_table().explode('ocel:type:' + self.ocel_case_notion).drop_duplicates().sort_values(["ocel:timestamp"])
 
-        df_features = df_filtered_ocel.filter(["ocel:eid","ocel:activity","ocel:timestamp"])
+        df_features = df_filtered_ocel.filter(["ocel:eid","ocel:activity","ocel:timestamp"]).iloc[:300,:]
         df_features.columns = ["case:concept:name","concept:name","time:timestamp"]
         df_features["case:concept:name"] = df_features["case:concept:name"].explode()
         
@@ -79,22 +81,18 @@ class EL2GraphTime():
         # Writing the profiled dataset
         ########################################################
         df_feature_vector.to_csv(f"./results/{database_name}_profiled.csv", index=False)
-
-        labels = df_feature_vector.index
-        distance_matrix = self.compute_distance_matrix(act_features, tra_features, time_features)
-        #pd.DataFrame(distance_matrix).to_csv("distance_matrix.csv", index=False, header=False)
-
-        # Extract the k-NN graph
-        G = self.extract_knn_graph(distance_matrix, n_neighbors=self.k)
-
-        #nx.set_node_attributes(G, labels, "Node")
-        print("Relabelling nodes...")
-        G_relabelled = nx.relabel_nodes(G, dict(zip(G.nodes, labels)), copy=True)
-        self.graphs.append(G_relabelled)
-
-        time_label = time_features.apply(lambda row: ''.join(row.astype(str)), axis=1)
-        G_relabelled_time = nx.relabel_nodes(G, dict(zip(G.nodes, time_label)), copy=True)
-        self.graphs.append(G_relabelled_time)
+        
+        for wa in [0.5, 1.0]:
+            for wt in [0.5, 1.0]:
+                for wtime in [0.5, 1.0, 1.5, 2.0]:
+                    distance_matrix = self.compute_distance_matrix(
+                        act_features * wa,
+                        tra_features * wt,
+                        time_features * wtime
+                    )
+                    G = self.extract_knn_graph(distance_matrix, n_neighbors=self.k)
+                    filename = f"./results/{database_name}_k{self.k}_wa{wa}_wt{wt}_wtime{wtime}.graphml"
+                    nx.write_graphml(G, filename)
 
     def __getitem__(self, idx):
         return self.graphs[idx]
