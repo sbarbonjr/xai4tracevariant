@@ -19,6 +19,7 @@ from skpm.event_feature_extraction import TimestampExtractor
 from sklearn.feature_extraction.text import CountVectorizer
 
 import time
+from pathlib import Path
 from tqdm import tqdm
 
 class EL2GraphTime():
@@ -33,6 +34,8 @@ class EL2GraphTime():
         
 
     def process(self):
+
+        database_name = Path(self.ocel_path).stem
         if 'sqlite' in self.ocel_path:
             ocel = pm4py.read_ocel_sqlite(self.ocel_path)
         else:
@@ -71,6 +74,12 @@ class EL2GraphTime():
         # Merge the DataFrames using the "case" index for edit distance computation
         df_feature_vector = pd.concat([act_features, tra_features, time_features], axis=1)
         #df_feature_vector.to_csv("feature_matrix.csv")
+        
+        ########################################################
+        # Writing the profiled dataset
+        ########################################################
+        df_feature_vector.to_csv(f"./results/{database_name}_profiled.csv", index=False)
+
         labels = df_feature_vector.index
         distance_matrix = self.compute_distance_matrix(act_features, tra_features, time_features)
         #pd.DataFrame(distance_matrix).to_csv("distance_matrix.csv", index=False, header=False)
