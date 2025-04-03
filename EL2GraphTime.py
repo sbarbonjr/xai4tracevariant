@@ -38,7 +38,11 @@ class EL2GraphTime():
     def process(self):
 
         database_name = Path(self.ocel_path).stem
-        if 'sqlite' in self.ocel_path:
+        if 'sqlite2' in self.ocel_path:
+            print("sqlite2")
+            ocel = pm4py.read_ocel2_sqlite(self.ocel_path)
+        elif 'sqlite' in self.ocel_path:
+            print("sqlite")
             ocel = pm4py.read_ocel_sqlite(self.ocel_path)
         else:
             ocel = pm4py.read_ocel2_json(self.ocel_path)
@@ -46,7 +50,7 @@ class EL2GraphTime():
                
         df_filtered_ocel = filtered_ocel.get_extended_table().explode('ocel:type:' + self.ocel_case_notion).drop_duplicates().sort_values(["ocel:timestamp"])
 
-        df_features = df_filtered_ocel.filter(["ocel:eid","ocel:activity","ocel:timestamp"]).iloc[:300,:]
+        df_features = df_filtered_ocel.filter(["ocel:eid","ocel:activity","ocel:timestamp"])
         df_features.columns = ["case:concept:name","concept:name","time:timestamp"]
         df_features["case:concept:name"] = df_features["case:concept:name"].explode()
         
@@ -82,18 +86,22 @@ class EL2GraphTime():
         ########################################################
         df_feature_vector.to_csv(f"./results/{database_name}_profiled.csv", index=True)
         
-        for wa in [0.5, 1.0]:
-            for wt in [0.5, 1.0]:
-                for wtime in [0.5, 1.0, 1.5, 2.0]:
-                    distance_matrix = self.compute_distance_matrix(
-                        act_features * wa,
-                        tra_features * wt,
-                        time_features * wtime
-                    )
-                    G = self.extract_knn_graph(distance_matrix, n_neighbors=self.k)
-                    G = nx.relabel_nodes(G, {i: case_id for i, case_id in enumerate(df_feature_vector.index)})
-                    filename = f"./results/{database_name}_k{self.k}_wa{wa}_wt{wt}_wtime{wtime}.graphml"
-                    nx.write_graphml(G, filename)
+        #for wa in [0.5, 1.0]:
+        #    for wt in [0.5, 1.0]:
+        
+        wa = 1
+        wt = 1
+        wtime = 1.5
+        #for wtime in [0.2, 0.5, 1.0, 1.5, 2.0]:
+        distance_matrix = self.compute_distance_matrix(
+            act_features * wa,
+            tra_features * wt,
+            time_features * wtime
+        )
+        G = self.extract_knn_graph(distance_matrix, n_neighbors=self.k)
+        G = nx.relabel_nodes(G, {i: case_id for i, case_id in enumerate(df_feature_vector.index)})
+        filename = f"./results/{database_name}_k{self.k}_wa{wa}_wt{wt}_wtime{wtime}.graphml"
+        nx.write_graphml(G, filename)
 
 
 

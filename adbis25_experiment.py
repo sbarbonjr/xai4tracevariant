@@ -12,7 +12,6 @@ import util as util
 
 from tqdm import tqdm 
 
-import os
 from pathlib import Path
 
 PATH = PATH = Path(__file__).resolve().parent
@@ -43,13 +42,9 @@ def community_detection(ocel_path):
     database_name = Path(ocel_path).stem
     database_name_list = list_files_with_prefix('./results/', database_name)
     
-    communities_data = {}
-    
-    for file in database_name_list[:1]:
-        combined_data = community_detection_with_centrality(file)
+    for file in database_name_list:
+        community_detection_with_centrality(file, resolution=1.0)
         
-    return communities_data
-
 def community_detection_with_centrality(ocel_path, resolution=0.5):
     """
     Enhanced community detection with node centrality analysis
@@ -57,20 +52,19 @@ def community_detection_with_centrality(ocel_path, resolution=0.5):
     Args:
         ocel_path (str): Path to the original file
         resolution (float): Louvain resolution parameter (higher = more communities)
-        
-    Returns:
-        tuple: (results_dict, combined_df)
     """
     # Setup paths and directories
     database_name = Path(ocel_path).stem
     database_name_list = list_files_with_prefix('./results/', database_name)
     output_dir = Path('./community_results/')
     output_dir.mkdir(exist_ok=True)
-    
-    results = {}
-    all_dfs = []
-    
-    for file in tqdm(database_name_list, desc="Processing files"):
+
+    progress_bar = tqdm(database_name_list, desc="🔍 Processing graphs")
+
+    for file in progress_bar:
+        file_stem = Path(file).stem
+        progress_bar.set_postfix(file=file_stem)  # Limit name length to avoid clutter
+
         try:
             # Load and prepare graph
             G = nx.read_graphml(file)
@@ -79,31 +73,31 @@ def community_detection_with_centrality(ocel_path, resolution=0.5):
             
             # Community detection
             partition = community_louvain.best_partition(G, resolution=resolution)
-            modularity = community_louvain.modularity(partition, G)
+            modularity = np.round(community_louvain.modularity(partition, G), 2)
             num_communities = len(set(partition.values()))
             
-            # Calculate all centrality measures
+            # Centrality measures
             centrality_measures = {
                 'degree': nx.degree_centrality(G),
                 'betweenness': nx.betweenness_centrality(G),
                 'closeness': nx.closeness_centrality(G),
                 'pagerank': nx.pagerank(G)
             }
-            
-            # Create node data DataFrame
+
+            # Node-level data
             node_data = []
             for node in G.nodes():
                 node_entry = {
                     'node': node,
                     'community': partition[node],
                     **{f'cent_{k}': v[node] for k, v in centrality_measures.items()},
-                    **G.nodes[node]  # include original attributes
+                    **G.nodes[node]
                 }
                 node_data.append(node_entry)
-            
+
             df = pd.DataFrame(node_data)
-            
-            # Find representative nodes for each community
+
+            # Representatives
             representatives = {}
             for comm_id in set(partition.values()):
                 comm_nodes = df[df['community'] == comm_id]
@@ -113,23 +107,16 @@ def community_detection_with_centrality(ocel_path, resolution=0.5):
                     'betweenness_rep': comm_nodes.loc[comm_nodes['cent_betweenness'].idxmax()]['node'],
                     'pagerank_rep': comm_nodes.loc[comm_nodes['cent_pagerank'].idxmax()]['node']
                 }
-            
-            # Save results
-            csv_path = output_dir / f"{Path(file).stem}_communities.csv"
-            df.to_csv(csv_path, index=False)
 
-            csv_path = output_dir / f"{Path(file).stem}_representative.csv"
-            pd.DataFrame(representatives).T.to_csv(csv_path, index=False)
+            # Save output
+            df.round(4).to_csv(output_dir / f"{file_stem}_modularity{modularity}_r{resolution}.csv", index=False)
+            pd.DataFrame(representatives).T.to_csv(output_dir / f"{file_stem}_numcom{num_communities}_r{resolution}_representative.csv", index=False)
 
-            
         except Exception as e:
-            print(f"\nError processing {file}: {str(e)}")
-    
-    # Combine all DataFrames
-    combined_df = pd.concat(all_dfs) if all_dfs else pd.DataFrame()
-    
-    return combined_df
+            tqdm.write(f"⚠️ Error processing {file_stem}: {str(e)}")
 
+    
+    
 def list_files_with_prefix(directory, database_name):
     directory = Path(directory)
     return list(directory.glob(f"{database_name}*.graphml"))
@@ -161,13 +148,13 @@ if __name__ == "__main__":
     }
 
     # Call the function with the command-line arguments
-    #extract_profiling(
-    #    ocel_path= str(PATH) + args.ocel_path,
-    #    k=args.k,
-    #    e=args.e,
-    #    ocel_case_notion=args.ocel_case_notion,
-    #    config_input=config_input
-    #)
+    extract_profiling(
+        ocel_path= str(PATH) + args.ocel_path,
+        k=args.k,
+        e=args.e,
+        ocel_case_notion=args.ocel_case_notion,
+        config_input=config_input
+    )
 
     community_detection(args.ocel_path)
 
