@@ -8,6 +8,7 @@ if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Generate and plot k-NN graph using OC4LGraph.")
     parser.add_argument('--ocel_path', type=str, required=True, help='Path to the OCEL JSON file.')
+    parser.add_argument("--graph_based", action="store_true", help="Enable graph-based explanation.")
     args = parser.parse_args()
     
 
@@ -24,7 +25,8 @@ if __name__ == "__main__":
         explainer = ELExplainer.ELExplainer(
             profile_df_path=profile_path,
             representatives_df_path=rep_file,
-            metric='degree_rep'
+            metric='degree_rep',
+            graph_based= args.graph_based
         )
         # Calculate cluster means
         #explainer.plot_time_explanation()

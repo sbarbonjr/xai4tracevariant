@@ -91,7 +91,7 @@ class EL2GraphTime():
         
         wa = 1
         wt = 1
-        wtime = 1.5
+        wtime = 1
         #for wtime in [0.2, 0.5, 1.0, 1.5, 2.0]:
         distance_matrix = self.compute_distance_matrix(
             act_features * wa,
