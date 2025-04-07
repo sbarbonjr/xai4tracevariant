@@ -91,17 +91,18 @@ class EL2GraphTime():
         
         wa = 1
         wt = 1
-        wtime = 1
-        #for wtime in [0.2, 0.5, 1.0, 1.5, 2.0]:
-        distance_matrix = self.compute_distance_matrix(
-            act_features * wa,
-            tra_features * wt,
-            time_features * wtime
-        )
-        G = self.extract_knn_graph(distance_matrix, n_neighbors=self.k)
-        G = nx.relabel_nodes(G, {i: case_id for i, case_id in enumerate(df_feature_vector.index)})
-        filename = f"./results/{database_name}_k{self.k}_wa{wa}_wt{wt}_wtime{wtime}.graphml"
-        nx.write_graphml(G, filename)
+        #wtime = 0.5
+        for wtime in [0.5, 1.0]:
+            distance_matrix = self.compute_distance_matrix(
+                act_features * wa,
+                tra_features * wt,
+                time_features * wtime
+            )
+            G = self.extract_knn_graph(distance_matrix, n_neighbors=self.k)
+            G = nx.relabel_nodes(G, {i: case_id for i, case_id in enumerate(df_feature_vector.index)})
+            filename = f"./results/{database_name}_k{self.k}_wa{wa}_wt{wt}_wtime{wtime}.graphml"
+            nx.write_graphml(G, filename)
+        
 
 
 

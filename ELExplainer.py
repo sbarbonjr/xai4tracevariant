@@ -41,8 +41,10 @@ class ELExplainer:
                 valid_nodes = set(self.representatives_df[self.metric].astype(str))
                 df = df[df.index.astype(str).isin(valid_nodes)]
         else:
+            self.representatives_df['case'] = self.representatives_df['case'].astype(str).str.replace(r'\.0$', '', regex=True)
             print("self.representatives_df <<<", self.representatives_df)
-            df = df[df.index.astype(str).isin(self.representatives_df['case'].astype(str))]
+            print("self.representatives_df <<<", self.representatives_df['case'])
+            df = df[df.index.astype(str).isin(self.representatives_df['case'])]
             print("df.index <<<", df.index)
             print("df <<<", df)
 

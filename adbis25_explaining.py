@@ -6,9 +6,9 @@ import os
 
 if __name__ == "__main__":
     # Set up argument parser
-    parser = argparse.ArgumentParser(description="Generate and plot k-NN graph using OC4LGraph.")
-    parser.add_argument('--ocel_path', type=str, required=True, help='Path to the OCEL JSON file.')
-    parser.add_argument("--graph_based", action="store_true", help="Enable graph-based explanation.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ocel_path', required=True, help="Path to OCEL log")
+    parser.add_argument('--graph_based', action='store_true', help="Enable graph-based explanation")
     args = parser.parse_args()
     
 
