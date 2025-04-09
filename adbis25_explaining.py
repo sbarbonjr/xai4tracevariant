@@ -11,8 +11,11 @@ if __name__ == "__main__":
     parser.add_argument('--graph_based', action='store_true', help="Enable graph-based explanation")
     args = parser.parse_args()
     
+    if (args.graph_based):
+        pattern = f"./community_results/{args.ocel_path}*_representative.csv"
+    else:
+        pattern = f"./cluster_results/{args.ocel_path}*.csv"
 
-    pattern = f"./community_results/{args.ocel_path}*_representative.csv"
 
     # Find all matching files
     matching_files = glob.glob(pattern)
@@ -20,7 +23,12 @@ if __name__ == "__main__":
 
     profile_path = f"./results/{args.ocel_path}_profiled.csv"
     for rep_file in matching_files:
-        base_name = os.path.basename(rep_file).replace("_representative.csv", "")
+        print('rep_file', rep_file)
+        if (args.graph_based):
+            base_name = os.path.basename(rep_file).replace("_representative.csv", "")
+        else:
+            base_name = os.path.basename(rep_file)
+
         # Initialize and run your explainer
         explainer = ELExplainer.ELExplainer(
             profile_df_path=profile_path,
