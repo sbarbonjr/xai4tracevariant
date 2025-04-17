@@ -4,6 +4,7 @@ import numpy as np
 
 import pickle
 
+
 from sklearn.neighbors import NearestNeighbors
 from sklearn.neighbors import kneighbors_graph
 from scipy.spatial.distance import euclidean
@@ -25,39 +26,63 @@ from pathlib import Path
 from tqdm import tqdm
 
 class EL2GraphTime():
-    def __init__(self, ocel_path, ocel_case_notion, config, k=3, plot=False):
+    def __init__(self, ocel_path, ocel_case_notion, config, k=3, just_profile=False, plot=False):
         self.ocel_path = ocel_path
         self.ocel_case_notion = ocel_case_notion
         self.plot = plot
+        self.just_profile = just_profile
         self.graphs = []
         self.config = config
         self.k = k
         self.process()
+
+    def load_xes(path):
+        log = pm4py.read_xes(path)
+        df = pm4py.convert_to_dataframe(log)
+        return df
         
 
     def process(self):
 
         database_name = Path(self.ocel_path).stem
-        if 'sqlite2' in self.ocel_path:
-            print("sqlite2")
-            ocel = pm4py.read_ocel2_sqlite(self.ocel_path)
-        elif 'sqlite' in self.ocel_path:
-            print("sqlite")
-            ocel = pm4py.read_ocel_sqlite(self.ocel_path)
-        else:
-            ocel = pm4py.read_ocel2_json(self.ocel_path)
-        filtered_ocel = pm4py.filter_ocel_object_attribute(ocel, 'ocel:type', [self.ocel_case_notion])
-               
-        df_filtered_ocel = filtered_ocel.get_extended_table().explode('ocel:type:' + self.ocel_case_notion).drop_duplicates().sort_values(["ocel:timestamp"])
+        if self.ocel_path.endswith(".xes"):
+            print("XES format detected")
+            log = pm4py.read_xes(self.ocel_path)
 
-        df_features = df_filtered_ocel.filter(["ocel:eid","ocel:activity","ocel:timestamp"])
-        df_features.columns = ["case:concept:name","concept:name","time:timestamp"]
-        df_features["case:concept:name"] = df_features["case:concept:name"].explode()
+            # Flatten to dataframe with common column names
+            df_features = pm4py.convert_to_dataframe(log)
+            df_features["case:concept:name"] = df_features["case:concept:name"].astype(str)  # Ensure strings
+            #df_features = df_features.filter(["concept:instance","concept:name","time:timestamp"])
+            df_features = df_features.filter(["EventID","concept:name","time:timestamp"])
+            df_features.columns = ["case:concept:name","concept:name","time:timestamp"]
+            df_features["concept:name"] = (
+                df_features["concept:name"]
+                .astype(str)  # ensure string type
+                .str.replace("-", "", regex=False)  # remove all "-"
+                .str.replace("0_", "", regex=False)
+                .str.replace("(", "", regex=False)
+                .str.replace(")", "", regex=False)
+                .str.replace(" ", "_", regex=False)  # replace " " with "_"
+            )
+        else:            
+            if 'sqlite2' in self.ocel_path:
+                print("sqlite2")
+                ocel = pm4py.read_ocel2_sqlite(self.ocel_path)
+            elif 'sqlite' in self.ocel_path:
+                print("sqlite")
+                ocel = pm4py.read_ocel_sqlite(self.ocel_path)
+            else:
+                print("json format assumed")
+                ocel = pm4py.read_ocel2_json(self.ocel_path)
+            filtered_ocel = pm4py.filter_ocel_object_attribute(ocel, 'ocel:type', [self.ocel_case_notion])
+            df_filtered_ocel = filtered_ocel.get_extended_table().explode('ocel:type:' + self.ocel_case_notion).drop_duplicates().sort_values(["ocel:timestamp"])
+            df_features = df_filtered_ocel.filter(["ocel:eid","ocel:activity","ocel:timestamp"])
+            df_features.columns = ["case:concept:name","concept:name","time:timestamp"]
+            df_features["case:concept:name"] = df_features["case:concept:name"].explode()
         
-        self.config["vector_size"] = df_features["concept:name"].unique()
+        self.config["vector_size"] = len(df_features["concept:name"].unique())
         act_features = self.run_onehot(df_features)
         act_features.columns = ["case"] + list(df_features["concept:name"].unique())
-        
         tra_features = self.get_trace_transition_matrix(df_features)
 
         tex = TimestampExtractor()
@@ -85,14 +110,12 @@ class EL2GraphTime():
         # Writing the profiled dataset
         ########################################################
         df_feature_vector.to_csv(f"./results/{database_name}_profiled.csv", index=True)
-        
-        #for wa in [0.5, 1.0]:
-        #    for wt in [0.5, 1.0]:
-        
-        wa = 1
-        wt = 1
-        #wtime = 0.5
-        for wtime in [0.5, 1.0]:
+
+
+        if not self.just_profile:
+            wa = 1
+            wt = 1
+            wtime = 0.5
             distance_matrix = self.compute_distance_matrix(
                 act_features * wa,
                 tra_features * wt,
@@ -102,9 +125,6 @@ class EL2GraphTime():
             G = nx.relabel_nodes(G, {i: case_id for i, case_id in enumerate(df_feature_vector.index)})
             filename = f"./results/{database_name}_k{self.k}_wa{wa}_wt{wt}_wtime{wtime}.graphml"
             nx.write_graphml(G, filename)
-        
-
-
 
     def __getitem__(self, idx):
         return self.graphs[idx]
@@ -224,11 +244,10 @@ class EL2GraphTime():
 
     def run_onehot(self, log):
         ids, traces = self.extract_corpus(log)
-
         start_time = time.time()
-
         # onehot encoding
-        corpus = CountVectorizer(analyzer="word", binary=True).fit_transform(traces)
+        vectorizer = CountVectorizer(analyzer="word", binary=True)
+        corpus = vectorizer.fit_transform(traces)
         encoding = corpus.toarray()
         
         end_time = time.time() - start_time
@@ -237,7 +256,6 @@ class EL2GraphTime():
         # formatting
         encoded_df = pd.DataFrame(encoding, columns=[f"{i}" for i in range(encoding.shape[1])])
         encoded_df.insert(0, "case", ids)
-
         return encoded_df
     
 

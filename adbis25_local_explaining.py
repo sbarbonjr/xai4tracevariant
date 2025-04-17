@@ -21,7 +21,7 @@ if __name__ == "__main__":
     matching_files.sort()
 
     profile_path = f"./results/{args.ocel_path}_profiled.csv"
-    rep_file = f'./community_results/tratime_k21_wa1_wt1_wtime0.5_numcom13_r1.0_representative.csv'
+    rep_file = f'./community_results/base_k15_wa1_wt1_wtime0.5_numcom14_r1.0_representative.csv'
     # Initialize and run your explainer
     explainer = ELExplainer.ELExplainer(
         profile_df_path=profile_path,
