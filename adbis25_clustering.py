@@ -13,6 +13,10 @@ import hashlib
 import ELExplainer as ELExplainer
 from scipy.spatial.distance import pdist, squareform
 
+from scipy.sparse import dok_matrix
+import numpy as np
+from joblib import Parallel, delayed
+
 
 def compute_mixed_distance(a, b, n):
     edit_dist = sum(levenshtein_distance(str(x), str(y)) for x, y in zip(a[:n], b[:n]))
@@ -29,11 +33,16 @@ def hamming_distance(a, b):
     return sum(x != y for x, y in zip(a, b))
 
 
-def compute_hamming_matrix_hashed(str_part, n_jobs=5):
+def compute_hamming_matrix_hashed(str_part, n_jobs=5, use_sparse_if_large=True, sparse_threshold=10000):
     print("🧠 Hashing traces...")
     hashed_traces = [fast_hash(trace) for trace in str_part]
     n = len(hashed_traces)
-    dist_matrix = np.zeros((n, n))
+
+    if use_sparse_if_large and n > sparse_threshold:
+        print(f"⚠️  Large dataset ({n} traces), using sparse matrix.")
+        dist_matrix = dok_matrix((n, n), dtype=np.float32)
+    else:
+        dist_matrix = np.zeros((n, n), dtype=np.float32)
 
     def dist_pair(i, j):
         d = hamming_distance(hashed_traces[i], hashed_traces[j])
