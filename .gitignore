@@ -1,3 +1,7 @@
 .venv/*
 __pycache__/*
 /datasets/*
+results/*
+results_img/*
+*.pyc
+*.pkl
