@@ -6,5 +6,4 @@ results_img/*
 *.pyc
 *.pkl
 adbis_datasets/*
-adbis_datasets/BPI2017O.xes
 .gitignore
