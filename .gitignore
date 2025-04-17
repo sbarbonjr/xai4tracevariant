@@ -5,3 +5,4 @@ results/*
 results_img/*
 *.pyc
 *.pkl
+adbis_datasets/*
