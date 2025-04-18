@@ -6,7 +6,7 @@
 FILE="BPI2017O"
 
 # List of k values you want to test
-K_VALUES=(2 3 4 5 6 7 8 9 10)
+K_VALUES=(2 3 4 5 6 7 8 9 10 11)
 
 # Loop over each k and run the Python script
 for K in "${K_VALUES[@]}"; do

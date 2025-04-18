@@ -52,8 +52,8 @@ class EL2GraphTime():
             # Flatten to dataframe with common column names
             df_features = pm4py.convert_to_dataframe(log)
             df_features["case:concept:name"] = df_features["case:concept:name"].astype(str)  # Ensure strings
-            #df_features = df_features.filter(["concept:instance","concept:name","time:timestamp"])
-            df_features = df_features.filter(["EventID","concept:name","time:timestamp"])
+            df_features = df_features.filter(["case:concept:name","concept:name","time:timestamp"])
+            #df_features = df_features.filter(["EventID","concept:name","time:timestamp"])
             df_features.columns = ["case:concept:name","concept:name","time:timestamp"]
             df_features["concept:name"] = (
                 df_features["concept:name"]

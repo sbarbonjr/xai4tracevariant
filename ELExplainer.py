@@ -234,8 +234,13 @@ class ELExplainer:
 
             titles = ["Activities", "Self-loops", "Transitions", "Time (Case)", "Time (Avg. Event)"]
             ax.set_title(titles[idx], fontsize=12)
+            if idx == 0:
+                ax.set_ylabel("Case Representatives")
+                ax.set_yticklabels(ax.get_yticklabels(), fontsize=10, rotation=45)
+            else:
+                ax.set_ylabel("")
+                ax.set_yticklabels([])
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=8)
-            ax.set_yticklabels(ax.get_yticklabels(), fontsize=10)
 
         plt.suptitle(f"Explaining Variants {self.dtaset_name}", fontsize=12)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -340,7 +345,7 @@ class ELExplainer:
                 cbar=True,
                 fmt=".1f",
                 linewidths=0.5,
-                annot_kws={"size": 12, "rotation": 0},
+                annot_kws={"size": 12, "rotation": 90},
                 ax=ax,
                 vmin=vmin,
                 vmax=vmax,

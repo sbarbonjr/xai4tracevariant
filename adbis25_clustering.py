@@ -170,7 +170,8 @@ if __name__ == "__main__":
     n_cpu = args.n_cpu
 
     input_path = f"./results/{file}_profiled.csv"
-    output_path = f"./cluster_results/{file}_medoids_k{k}.csv"
+    output_path = f"./cluster_for_scoring_results/{file}_k{k}.csv"
+    output_path_medoids = f"./cluster_results/{file}_medoids_k{k}.csv"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     print(f"📂 Loading data from {input_path}")
@@ -178,15 +179,17 @@ if __name__ == "__main__":
 
     df_clustered = kmeans_custom_distance_optimized(df, k, n_jobs=n_cpu)
     n = max(i + 1 for i, col in enumerate(df_clustered.columns) if '->' in col)
+    df_clustered.to_csv(output_path, index=False)
     medoids_df = get_cluster_medoids_optimized(df_clustered, n, n_jobs=n_cpu)
 
     output = medoids_df[["case", "cluster"]].rename(columns={"cluster": "community"})
-    output.to_csv(output_path, index=False)
-    print(f"📂 Medoids saved to {output_path}")
+    output.to_csv(output_path_medoids, index=False)
+
+    print(f"📂 Medoids saved to {output_path_medoids}")
 
     explainer = ELExplainer.ELExplainer(
         profile_df_path=input_path,
-        representatives_df_path=output_path,
+        representatives_df_path=output_path_medoids,
         metric='degree_rep',
         graph_based=False
     )
