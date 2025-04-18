@@ -1,7 +1,6 @@
 import os
 import time
 import random
-import hashlib
 import argparse
 import numpy as np
 import pandas as pd
@@ -12,8 +11,8 @@ from joblib import Parallel, delayed
 from sklearn.preprocessing import StandardScaler
 from Levenshtein import distance as levenshtein_distance
 from scipy.spatial.distance import pdist, squareform
-from scipy.sparse import dok_matrix
 
+from datasketch import MinHash
 import ELExplainer
 
 
@@ -23,38 +22,33 @@ def compute_mixed_distance(a, b, n):
     return edit_dist + eucl_dist
 
 
-def fast_hash(trace, length=16):
-    joined = "_".join(trace)
-    return hashlib.md5(joined.encode()).hexdigest()[:length]
+def compute_minhash_signature(trace, num_perm=128):
+    m = MinHash(num_perm=num_perm)
+    for event in trace:
+        m.update(str(event).encode('utf8'))
+    return m
 
 
-def hamming_distance(a, b):
-    return sum(x != y for x, y in zip(a, b))
+def compute_minhash_distance_matrix(traces, num_perm=128, n_jobs=5):
+    print(f"🧠 Generating MinHash signatures for {len(traces)} traces...")
+    signatures = Parallel(n_jobs=n_jobs)(
+        delayed(compute_minhash_signature)(trace, num_perm)
+        for trace in tqdm(traces, desc="MinHash signatures")
+    )
 
+    n = len(signatures)
+    dist_matrix = np.zeros((n, n), dtype=np.float32)
 
-def compute_hamming_matrix_hashed(str_part, n_jobs=5, use_sparse_if_large=True, sparse_threshold=10000):
-    print("🧠 Hashing traces...")
-    hashed_traces = [fast_hash(trace) for trace in str_part]
-    n = len(hashed_traces)
+    def compute_distance(i, j):
+        sim = signatures[i].jaccard(signatures[j])
+        return i, j, 1 - sim  # Convert similarity to distance
 
-    if use_sparse_if_large and n > sparse_threshold:
-        print(f"⚠️  Large dataset ({n} traces), using sparse matrix.")
-        dist_matrix = dok_matrix((n, n), dtype=np.float32)
-    else:
-        dist_matrix = np.zeros((n, n), dtype=np.float32)
-
-    def dist_pair(i, j):
-        d = hamming_distance(hashed_traces[i], hashed_traces[j])
-        return i, j, d
-
-    print("⚡ Computing Hamming distances in parallel...")
-
-    # Generate all index pairs once
+    print("⚡ Calculating pairwise MinHash distances...")
     index_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
 
-    # Wrap with tqdm to show progress
-    results = Parallel(n_jobs=n_jobs, backend="loky")(
-        delayed(dist_pair)(i, j) for i, j in tqdm(index_pairs, desc="Computing Hamming", total=len(index_pairs))
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(compute_distance)(i, j)
+        for i, j in tqdm(index_pairs, desc="Pairwise distances", total=len(index_pairs))
     )
 
     for i, j, d in results:
@@ -130,15 +124,15 @@ def kmeans_custom_distance_optimized(df, k, n_jobs=-1):
 
 
 def get_cluster_medoids_optimized(df_with_clusters, n, n_jobs=-1):
-    print("📍 Selecting medoids with Hamming distance on hashed traces...")
+    print("📍 Selecting medoids with MinHash + Euclidean distances...")
     medoids = []
 
     str_part_all = df_with_clusters.iloc[:, :n].astype(str).values.tolist()
     num_part_all = df_with_clusters.iloc[:, n:-1].astype(float).values
 
-    hamming_matrix = compute_hamming_matrix_hashed(str_part_all, n_jobs=n_jobs)
+    minhash_matrix = compute_minhash_distance_matrix(str_part_all, n_jobs=n_jobs)
     eucl_matrix = compute_euclidean_matrix(num_part_all)
-    full_distance_matrix = hamming_matrix + eucl_matrix
+    full_distance_matrix = minhash_matrix + eucl_matrix
 
     index_map = dict(enumerate(df_with_clusters.index.tolist()))
 
@@ -200,6 +194,3 @@ if __name__ == "__main__":
     print("📈 Generating explanation plots...")
     explainer.plot_explanation(explainer.profile_df, True)
     print("✅ All done!")
-
-
-#python3 adbis25_clustering.py --file BPI2017O --k 3 --n_cpu 4
