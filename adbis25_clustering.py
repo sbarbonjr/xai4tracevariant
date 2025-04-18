@@ -48,10 +48,13 @@ def compute_hamming_matrix_hashed(str_part, n_jobs=5, use_sparse_if_large=True, 
         return i, j, d
 
     print("⚡ Computing Hamming distances in parallel...")
-    results = Parallel(n_jobs=n_jobs, backend="loky", verbose=5)(
-        delayed(dist_pair)(i, j)
-        for i in range(n)
-        for j in range(i + 1, n)
+
+    # Generate all index pairs once
+    index_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
+
+    # Wrap with tqdm to show progress
+    results = Parallel(n_jobs=n_jobs, backend="loky")(
+        delayed(dist_pair)(i, j) for i, j in tqdm(index_pairs, desc="Computing Hamming", total=len(index_pairs))
     )
 
     for i, j, d in results:
