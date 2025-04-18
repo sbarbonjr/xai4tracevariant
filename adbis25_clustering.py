@@ -29,35 +29,6 @@ def compute_minhash_signature(trace, num_perm=128):
     return m
 
 
-def compute_minhash_distance_matrix(traces, num_perm=128, n_jobs=5):
-    print(f"🧠 Generating MinHash signatures for {len(traces)} traces...")
-    signatures = Parallel(n_jobs=n_jobs)(
-        delayed(compute_minhash_signature)(trace, num_perm)
-        for trace in tqdm(traces, desc="MinHash signatures")
-    )
-
-    n = len(signatures)
-    dist_matrix = np.zeros((n, n), dtype=np.float32)
-
-    def compute_distance(i, j):
-        sim = signatures[i].jaccard(signatures[j])
-        return i, j, 1 - sim  # Convert similarity to distance
-
-    print("⚡ Calculating pairwise MinHash distances...")
-    index_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
-
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(compute_distance)(i, j)
-        for i, j in tqdm(index_pairs, desc="Pairwise distances", total=len(index_pairs))
-    )
-
-    for i, j, d in results:
-        dist_matrix[i, j] = d
-        dist_matrix[j, i] = d
-
-    return dist_matrix
-
-
 def compute_euclidean_matrix(num_part):
     return squareform(pdist(num_part, metric='euclidean'))
 
@@ -123,35 +94,49 @@ def kmeans_custom_distance_optimized(df, k, n_jobs=-1):
     return df_out
 
 
-def get_cluster_medoids_optimized(df_with_clusters, n, n_jobs=-1):
-    print("📍 Selecting medoids with MinHash + Euclidean distances...")
+def get_cluster_medoids_minhash_per_cluster(df_with_clusters, n, n_jobs=-1, num_perm=128):
+    print("📍 Selecting medoids (MinHash on demand, per cluster)...")
     medoids = []
 
-    str_part_all = df_with_clusters.iloc[:, :n].astype(str).values.tolist()
-    num_part_all = df_with_clusters.iloc[:, n:-1].astype(float).values
-
-    minhash_matrix = compute_minhash_distance_matrix(str_part_all, n_jobs=n_jobs)
-    eucl_matrix = compute_euclidean_matrix(num_part_all)
-    full_distance_matrix = minhash_matrix + eucl_matrix
-
-    index_map = dict(enumerate(df_with_clusters.index.tolist()))
-
     for cluster_id in sorted(df_with_clusters['cluster'].unique()):
-        cluster_indices = df_with_clusters[df_with_clusters['cluster'] == cluster_id].index.tolist()
-        if len(cluster_indices) == 1:
-            medoids.append(df_with_clusters.loc[cluster_indices[0]])
+        cluster_df = df_with_clusters[df_with_clusters['cluster'] == cluster_id]
+
+        if len(cluster_df) == 1:
+            medoids.append(cluster_df.iloc[0])
             continue
 
-        positions = [list(index_map.values()).index(idx) for idx in cluster_indices]
-        submatrix = full_distance_matrix[np.ix_(positions, positions)]
+        str_part = cluster_df.iloc[:, :n].astype(str).values.tolist()
+        num_part = cluster_df.iloc[:, n:-1].astype(float).values
 
-        dist_sums = submatrix.sum(axis=1)
+        print(f"🔹 Processing cluster {cluster_id} with {len(str_part)} traces")
+
+        # MinHash signatures
+        signatures = Parallel(n_jobs=n_jobs)(
+            delayed(compute_minhash_signature)(trace, num_perm) for trace in str_part
+        )
+
+        m = len(signatures)
+        dist_matrix = np.zeros((m, m), dtype=np.float32)
+
+        def compute_distance(i, j):
+            sim = signatures[i].jaccard(signatures[j])
+            dist = 1 - sim + np.linalg.norm(num_part[i] - num_part[j])
+            return i, j, dist
+
+        pairs = [(i, j) for i in range(m) for j in range(i + 1, m)]
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(compute_distance)(i, j) for i, j in tqdm(pairs, desc=f"Cluster {cluster_id}")
+        )
+
+        for i, j, d in results:
+            dist_matrix[i, j] = d
+            dist_matrix[j, i] = d
+
+        dist_sums = dist_matrix.sum(axis=1)
         min_idx = np.argmin(dist_sums)
-        best_global_idx = cluster_indices[min_idx]
+        medoids.append(cluster_df.iloc[min_idx])
 
-        medoids.append(df_with_clusters.loc[best_global_idx])
-
-    print("✅ Medoid selection completed.")
+    print("✅ Medoid selection completed (memory efficient).")
     return pd.DataFrame(medoids)
 
 
@@ -177,7 +162,8 @@ if __name__ == "__main__":
     df_clustered = kmeans_custom_distance_optimized(df, k, n_jobs=n_cpu)
     n = max(i + 1 for i, col in enumerate(df_clustered.columns) if '->' in col)
     df_clustered.to_csv(output_path, index=False)
-    medoids_df = get_cluster_medoids_optimized(df_clustered, n, n_jobs=n_cpu)
+
+    medoids_df = get_cluster_medoids_minhash_per_cluster(df_clustered, n, n_jobs=n_cpu)
 
     output = medoids_df[["case", "cluster"]].rename(columns={"cluster": "community"})
     output.to_csv(output_path_medoids, index=False)
