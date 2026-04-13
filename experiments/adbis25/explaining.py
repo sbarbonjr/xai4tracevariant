@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import ELExplainer as ELExplainer
 import argparse
 import glob
@@ -10,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument('--ocel_path', required=True, help="Path to OCEL log")
     parser.add_argument('--graph_based', action='store_true', help="Enable graph-based explanation")
     args = parser.parse_args()
-    
+
     if (args.graph_based):
         pattern = f"./community_results/{args.ocel_path}*_representative.csv"
     else:

@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import ELExplainer as ELExplainer
 import argparse
 import glob
@@ -12,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument('--case_id', help="Enable graph-based explanation")
     parser.add_argument('--variant_case',help="Enable graph-based explanation")
     args = parser.parse_args()
-    
+
 
     pattern = f"./community_results/{args.ocel_path}*_representative.csv"
 
@@ -33,4 +37,3 @@ if __name__ == "__main__":
     #explainer.plot_time_explanation()
     #explainer.plot_explanation(explainer.profile_df, True)
     explainer.local_explanation(case=args.case_id, variant_case=args.variant_case)
-        
